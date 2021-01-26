@@ -5,6 +5,7 @@ using System.Data.Common;
 using System.Data.Entity;
 using System.Linq;
 
+// NOTE: Keep unix LF endings in this file as required by test
 namespace Microsoft.Linq.Translations.Tests
 {
   [TestFixture]
@@ -33,7 +34,7 @@ This is the derived class implementation - for derived one
 This is the derived class implementation - for derived two
 This is the base class implementation
 This is the derived class implementation - for derived two";
-          var output = String.Join("\r\n", context.Bases.Select(b => b.DisplayName).WithTranslations());
+          var output = String.Join("\n", context.Bases.Select(b => b.DisplayName).WithTranslations());
           Console.WriteLine(output);
           Assert.AreEqual(expected, output);
         }
@@ -92,6 +93,7 @@ This is the derived class implementation - for derived two";
   public class DerivedThreeNoOverride : Base
   {
   }
+  
   public class DerivedFourFromTwoNoOverride : DerivedTwo
   {
   }
