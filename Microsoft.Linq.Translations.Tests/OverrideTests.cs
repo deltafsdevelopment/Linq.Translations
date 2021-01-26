@@ -1,15 +1,11 @@
-﻿using Microsoft.Linq.Translations;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Data.Common;
 using System.Data.Entity;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Deltafs.Platinum.InMemoryDatabase.IntegrationTests
+namespace Microsoft.Linq.Translations.Tests
 {
   /// <summary>
   ///  Microsoft.Liq.Translations is a third party linrary we use to simplify the definition of Linq-to-entities friendly
