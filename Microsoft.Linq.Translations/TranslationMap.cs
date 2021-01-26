@@ -1,76 +1,172 @@
 ﻿// Copyright (c) Microsoft Corporation.  All rights reserved.
 // This source code is made available under the terms of the Microsoft Public License (MS-PL)
-using System;
-using System.Collections.Generic;
-using System.Linq.Expressions;
-using System.Reflection;
-
 namespace Microsoft.Linq.Translations
 {
+  using System;
+  using System.Collections.Generic;
+  using System.Linq.Expressions;
+  using System.Reflection;
+  using System.Linq;
+
+  /// <summary>
+  /// Maintains a list of mappings between properties and their compiled expressions.
+  /// </summary>
+  public class TranslationMap : Dictionary<MemberInfo, CompiledExpression>
+  {
+    public static TranslationMap DefaultMap { get; } = new OverrideTranslationMap();
+    public static TranslationMap EvaluateMap { get; } = new TranslationMap();
+
     /// <summary>
-    /// Maintains a list of mappings between properties and their compiled expressions.
+    /// Get the <see cref="CompiledExpression{T, TResult}"/> for a given property.
     /// </summary>
-    public class TranslationMap : Dictionary<MemberInfo, CompiledExpression>
+    /// <typeparam name="T">Type of object this property is translated for.</typeparam>
+    /// <typeparam name="TResult">Result type of property.</typeparam>
+    /// <param name="method">Property definition to look-up.</param>
+    /// <returns><see cref="CompiledExpression{T, TResult}"/> for this property.</returns>
+    public CompiledExpression<T, TResult> Get<T, TResult>(MethodBase method)
     {
-        internal static readonly TranslationMap DefaultMap = new TranslationMap();
+      if (method == null) throw new ArgumentNullException(nameof(method));
 
-        /// <summary>
-        /// Get the <see cref="CompiledExpression{T, TResult}"/> for a given property.
-        /// </summary>
-        /// <typeparam name="T">Type of object this property is translated for.</typeparam>
-        /// <typeparam name="TResult">Result type of property.</typeparam>
-        /// <param name="method">Property definition to look-up.</param>
-        /// <returns><see cref="CompiledExpression{T, TResult}"/> for this property.</returns>
-        public CompiledExpression<T, TResult> Get<T, TResult>(MethodBase method)
-        {
-            if (method == null) throw new ArgumentNullException(nameof(method));
-
-            var propertyInfo = method.DeclaringType.GetRuntimeProperty(method.Name.Replace("get_", String.Empty));
-            return this[propertyInfo] as CompiledExpression<T, TResult>;
-        }
-
-        /// <summary>
-        /// Associate an existing <see cref="CompiledExpression{T, TResult}"/> to be translated for
-        /// the specified <paramref name="property"/>.
-        /// </summary>
-        /// <typeparam name="T">Type of object this property is translated for.</typeparam>
-        /// <typeparam name="TResult">Result type of property.</typeparam>
-        /// <param name="property">Property reference to associate this <see cref="CompiledExpression{T, TResult}"/> to.</param>
-        /// <param name="compiledExpression">A <see cref="CompiledExpression{T, TResult}"/> to associate this <paramref name="property"/> with.</param>
-        /// <returns><see cref="CompiledExpression{T, TResult}"/> for this property.</returns>
-        public void Add<T, TResult>(Expression<Func<T, TResult>> property, CompiledExpression<T, TResult> compiledExpression)
-        {
-            if (property == null) throw new ArgumentNullException(nameof(property));
-            if (compiledExpression == null) throw new ArgumentNullException(nameof(compiledExpression));
-            
-            // deltafsdevelopment May 2013 - Fix to the code here so that if the prop is an override the derived class type name is
-            // is stored in the translation map not the base class name that way we can have different expressions mapped to the
-            // same override in different derived classes
-            if (property.Parameters.Count > 0)
-            {
-              ParameterExpression expr = property.Parameters[0];
-              PropertyInfo pi = expr.Type.GetProperty(((MemberExpression)property.Body).Member.Name);
-              base.Add(pi, compiledExpression);
-            }
-        }
-
-        /// <summary>
-        /// Associate a <paramref name="expression"/> to be translated for
-        /// the specified <paramref name="property"/>.
-        /// </summary>
-        /// <typeparam name="T">Type of object this property is translated for.</typeparam>
-        /// <typeparam name="TResult">Result type of property.</typeparam>
-        /// <param name="property">Property reference to associate this <paramref name="expression"/> to.</param>
-        /// <param name="expression">Expression to associate with this <paramref name="property"/> with.</param>
-        /// <returns><see cref="CompiledExpression{T, TResult}"/> for this property.</returns>
-        public CompiledExpression<T, TResult> Add<T, TResult>(Expression<Func<T, TResult>> property, Expression<Func<T, TResult>> expression)
-        {
-            if (property == null) throw new ArgumentNullException(nameof(property));
-            if (expression == null) throw new ArgumentNullException(nameof(expression));
-
-            var compiledExpression = new CompiledExpression<T, TResult>(expression);
-            Add(property, compiledExpression);
-            return compiledExpression;
-        }
+      var propertyInfo = method.DeclaringType.GetRuntimeProperty(method.Name.Replace("get_", String.Empty));
+      return this[propertyInfo] as CompiledExpression<T, TResult>;
     }
+	
+    /// <typeparam name="T">Type of object this property is translated for.</typeparam>
+    /// <typeparam name="TResult">Result type of property.</typeparam>
+    /// <param name="property">Property reference to associate this <paramref name="expression"/> to.</param>
+    /// <param name="expression">Expression to associate with this <paramref name="property"/> with.</param>
+    /// <returns><see cref="CompiledExpression{T, TResult}"/> for this property.</returns>
+    public CompiledExpression<T, TResult> Add<T, TResult>(Expression<Func<T, TResult>> property, Expression<Func<T, TResult>> expression)
+    {
+      if (property == null) throw new ArgumentNullException(nameof(property));
+      if (expression == null) throw new ArgumentNullException(nameof(expression));	  
+
+      var compiledExpression = new CompiledExpression<T, TResult>(expression);
+      this.Add(property, compiledExpression);
+      return compiledExpression;
+    }
+
+    /// Associate an existing <see cref="CompiledExpression{T, TResult}"/> to be translated for
+    /// the specified <paramref name="property"/>.
+    /// </summary>
+    /// <typeparam name="T">Type of object this property is translated for.</typeparam>
+    /// <typeparam name="TResult">Result type of property.</typeparam>
+    /// <param name="property">Property reference to associate this <see cref="CompiledExpression{T, TResult}"/> to.</param>
+    /// <param name="compiledExpression">A <see cref="CompiledExpression{T, TResult}"/> to associate this <paramref name="property"/> with.</param>
+    /// <returns><see cref="CompiledExpression{T, TResult}"/> for this property.</returns>
+    public void Add<T, TResult>(Expression<Func<T, TResult>> property, CompiledExpression<T, TResult> compiledExpression)
+    {
+      if (property == null) throw new ArgumentNullException(nameof(property));
+      if (compiledExpression == null) throw new ArgumentNullException(nameof(compiledExpression));
+
+      // deltafsdevelopment May 2013 - Fix to the code here so that if the prop is an override the derived class type name is
+      // is stored in the translation map not the base class name that way we can have different expressions mapped to the
+      // same override in different derived classes
+      if (property.Parameters.Count > 0)
+      {
+        ParameterExpression expr = property.Parameters[0];
+        MemberInfo mi = null;
+        var me = property.Body as MemberExpression;
+        if (me != null)
+        {
+          mi = expr.Type.GetProperty(me.Member.Name);
+        }
+        else
+        {
+          var mc = property.Body as MethodCallExpression;
+          if (mc != null)
+          {
+            mi = expr.Type.SafeGetPublicMethod(mc.Method.Name);
+          }
+        }
+        if (mi == null)
+        {
+          throw new ArgumentException("Expression does not reflect a property or method of the type", "property");
+        }
+        if (this.ContainsKey(mi) && this[mi].IsAuto)
+        {
+          // replace the autogenerated base mapping with the "real" one!
+          this[mi] = compiledExpression;
+        }
+        else
+        {
+          base.Add(mi, compiledExpression);
+          this.AfterAddingNew<TResult>(expr, mi, me);
+        }
+        this.AfterAdding(mi);
+      }
+    }
+
+    protected virtual void AfterAddingNew<TResult>(ParameterExpression expr, MemberInfo mi, MemberExpression me)
+    {
+      
+    }
+
+    protected virtual void AfterAdding(MemberInfo mi)
+    {
+
+    }
+  }
+
+  /// <summary>
+  /// Maintains a list of mappings between properties and their compiled expressions and caters for overrides and inheritance
+  /// </summary>
+  public class OverrideTranslationMap : TranslationMap
+  {
+
+    protected override void AfterAddingNew<TResult>(ParameterExpression expr, MemberInfo mi, MemberExpression me)
+    {
+      // ensure that a mapping exists for the most basic type with the property
+      var type = expr.Type.BaseType;
+      Type rootType = expr.Type;
+      MemberInfo rootMi = null;
+      var memberName = mi.Name;
+      if (me != null)
+      {
+        while (type != typeof(Object) && type != null)
+        {
+          MemberInfo[] mis = type.GetMember(memberName, BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+          if (mis != null && mis.Length > 0 && mis[0] != null)
+          {
+            ExpressiveExtensions.EnsureTypeInitialized(type, false);
+            rootType = type;
+            rootMi = mis[0];
+            type = type.BaseType;
+          }
+          else
+          {
+            break;
+          }
+        }
+      }
+
+      if (rootMi != null && !this.ContainsKey(rootMi))
+      {
+        var param = Expression.Parameter(rootType, "o");
+        var member = Expression.MakeMemberAccess(param, rootMi);
+        var methodg = typeof(ExpressiveExtensions).GetMethod("NoTranslate", BindingFlags.Static | BindingFlags.Public);
+        var method = methodg.MakeGenericMethod(typeof(TResult));
+        var call = Expression.Call(null, method, member);
+        var lambda = Expression.Lambda(call, new ParameterExpression[] { param });
+        var ce = CompiledExpression.MakeCompiledExpression(rootType, typeof(TResult), lambda, isAuto: true);
+        base.Add(rootMi, ce);
+      }
+    }
+
+    protected override void AfterAdding(MemberInfo mi)
+    {
+      // "fix up" the overrides
+      var related = (from m in this
+                     where m.Key.Name == mi.Name
+                       && (mi.DeclaringType.IsAssignableFrom(m.Key.DeclaringType)
+                       || m.Key.DeclaringType.IsAssignableFrom(mi.DeclaringType))
+                     select m).ToList();
+      foreach (var c in related)
+      {
+        c.Value.ProcessOverrides(related.Where(d => c.Key != d.Key &&
+                                               c.Key.DeclaringType.IsAssignableFrom(d.Key.DeclaringType) &&
+                                               d.Key.DeclaringType != typeof(Enum)).ToArray());
+      }
+    }
+  }
 }

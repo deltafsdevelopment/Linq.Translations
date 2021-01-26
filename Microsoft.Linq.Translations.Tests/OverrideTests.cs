@@ -4,11 +4,13 @@ using System.ComponentModel.DataAnnotations;
 using System.Data.Common;
 using System.Data.Entity;
 using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
 
 namespace Microsoft.Linq.Translations.Tests
 {
   /// <summary>
-  ///  Microsoft.Liq.Translations is a third party linrary we use to simplify the definition of Linq-to-entities friendly
+  ///  Microsoft.Linq.Translations is a third party linrary we use to simplify the definition of Linq-to-entities friendly
   ///  calculated fields in entities, we have made some minor enhancements to the library these tests test those enhancements
   /// </summary>
   [TestFixture]
@@ -19,6 +21,7 @@ namespace Microsoft.Linq.Translations.Tests
     {
       [Key]
       public Int32 pk { get; set; }
+      public virtual String ClassName { get; set; }
       public virtual String NormalAttribute { get; set; }
       public virtual String CalculatedAttribute
       {
@@ -28,7 +31,7 @@ namespace Microsoft.Linq.Translations.Tests
         }
       }
 
-      private static CompiledExpression<DemoBaseClass, String> expCalculatedAttribute =
+      public static CompiledExpression<DemoBaseClass, String> expCalculatedAttribute =
         DefaultTranslationOf<DemoBaseClass>.Property(p => p.CalculatedAttribute)
           .Is(o => o.NormalAttribute);
     }
@@ -107,19 +110,25 @@ namespace Microsoft.Linq.Translations.Tests
     private void SeedContext(DemoContext context)
     {
       //seed some data in
-      var demo = new DemoBaseClass() { NormalAttribute = "TEST" };
+      var demo = new DemoBaseClass() { ClassName = "DemoBaseClass", NormalAttribute = "TEST" };
       context.DemoBaseClasses.Add(demo);
 
-      var demo1 = new DemoDerivedClass1() { NormalAttribute = "TEST1" };
+      var demo1 = new DemoDerivedClass1() { ClassName = "DemoDerivedClass1", NormalAttribute = "TEST1" };
       context.DemoDerivedClassOnes.Add(demo1);
 
-      var demo2 = new DemoDerivedClass2() { NormalAttribute = "TEST2" };
+      var demo2 = new DemoDerivedClass2() { ClassName = "DemoDerivedClass2", NormalAttribute = "TEST2" };
       context.DemoDerivedClassTwos.Add(demo2);
 
-      var demo3 = new DemoDerivedClass3() { NormalAttribute = "TEST3" };
+      var demo3 = new DemoDerivedClass3() { ClassName = "DemoDerivedClass3", NormalAttribute = "TEST3" };
       context.DemoDerivedClassThrees.Add(demo3);
 
       context.SaveChanges();
+    }
+
+    [Test]
+    public void CompiledExpression_ToString_Test()
+    {
+      Assert.AreEqual("o => o.NormalAttribute", DemoBaseClass.expCalculatedAttribute.ToString());
     }
 
     [Test]
@@ -150,7 +159,7 @@ namespace Microsoft.Linq.Translations.Tests
     }
 
     [Test]
-    public void LinqTranslations_CalculatedAttribute_OverrideBehaviour()
+    public void LinqTranslations_CalculatedAttribute_OverrideBehaviourExplicitType()
     {
       using (var connection = Effort.DbConnectionFactory.CreateTransient())
       {
@@ -180,6 +189,48 @@ namespace Microsoft.Linq.Translations.Tests
         }
       }
     }
-  }
 
+    [Test]
+    public void LinqTranslations_CalculatedAttribute_OverrideBehaviourRuntimeType()
+    {
+      using (var connection = Effort.DbConnectionFactory.CreateTransient())
+      {
+        using (var context = new DemoContext(connection))
+        {
+          SeedContext(context);
+        }
+
+        using (var context = new DemoContext(connection))
+        {
+          var qry = from m in context.DemoBaseClasses
+                    select new { m.ClassName,
+                                 m.CalculatedAttribute
+                               };
+          qry = qry.WithTranslations();
+          foreach (var item in qry)
+          {
+            String expected;
+            switch (item.ClassName)
+            {
+              case "DemoDerivedClass1":
+              case "DemoDerivedClass2":
+                expected = "Calculated Override 1";
+                break;
+              case "DemoDerivedClass3":
+                expected = "Override 3";
+                break;
+
+              default:
+                expected = "TEST";
+                break;
+            }
+            Assert.AreEqual(expected, item.CalculatedAttribute, $"Incorrect calculation called for '{item.ClassName}'");
+          }
+
+        }
+
+      }
+    }
+
+  }
 }

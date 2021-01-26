@@ -1,11 +1,11 @@
 ﻿// Copyright (c) Microsoft Corporation.  All rights reserved.
 // This source code is made available under the terms of the Microsoft Public License (MS-PL)
-using System;
-using System.Linq.Expressions;
-using System.Reflection;
-
 namespace Microsoft.Linq.Translations
 {
+    using System;
+    using System.Linq.Expressions;
+    using System.Reflection;
+
     /// <summary>
     /// Simple fluent way to access the default translation map.
     /// </summary>
@@ -22,6 +22,10 @@ namespace Microsoft.Linq.Translations
         /// <returns>A <see cref="CompiledExpression{T, TResult}"/> with details of this property including a compiled version for local evaluation.</returns>
         public static CompiledExpression<T, TResult> Property<TResult>(Expression<Func<T, TResult>> property, Expression<Func<T, TResult>> expression)
         {
+            if (typeof(T).IsSealed || typeof(T) == typeof(Enum))
+            {
+              TranslationMap.EvaluateMap.Add(property, expression);
+            }
             return TranslationMap.DefaultMap.Add(property, expression);
         }
 
@@ -36,7 +40,12 @@ namespace Microsoft.Linq.Translations
         {
             return new IncompletePropertyTranslation<TResult>(property);
         }
-
+		
+        public static IncompletePropertyTranslation<TResult> Method<TResult>(Expression<Func<T, TResult>> property)
+        {
+          return new IncompletePropertyTranslation<TResult>(property);
+        }
+		
         /// <summary>
         /// Evaluate a property for a given instance using the default <see cref="TranslationMap"/>/
         /// </summary>
